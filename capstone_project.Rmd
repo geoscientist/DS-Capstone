@@ -19,11 +19,31 @@ unzip(zipfile = "swiftkey.zip")
 
 ```
 
-You can also embed plots, for example:
+```{r}
+con <- file("en_US/en_US.blogs.txt")
+lines <- readLines(con)
+lines <- sample(lines, length(lines)/2, replace = FALSE)
+write(lines, "/home/aleksey/projects/datascience_capstone/data/sample/en_US.blogs.txt")
+close(con)
+
+con <- file("en_US/en_US.news.txt")
+lines <- readLines(con)
+lines <- sample(lines, length(lines)/2, replace = FALSE)
+write(lines, "/home/aleksey/projects/datascience_capstone/data/sample/en_US.news.txt")
+close(con)
+
+con <- file("en_US/en_US.twitter.txt")
+lines <- readLines(con)
+lines <- sample(lines, length(lines)/2, replace = FALSE)
+write(lines, "/home/aleksey/projects/datascience_capstone/data/sample/en_US.twitter.txt")
+close(con)
+```
+
+Now we can create text collextion using 'tm' package and perform some data cleaning steps:
 
 ```{r, echo=FALSE}
 #create text collection for 3 'en_US' files
 textcol = Corpus(x = DirSource("en_US"), readerControl = list(language = "en_US"))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
