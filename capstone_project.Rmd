@@ -23,19 +23,19 @@ unzip(zipfile = "swiftkey.zip")
 con <- file("en_US/en_US.blogs.txt")
 lines <- readLines(con)
 lines <- sample(lines, length(lines)/2, replace = FALSE)
-write(lines, "/home/aleksey/projects/datascience_capstone/data/sample/en_US.blogs.txt")
+write(lines, "./sample/en_US.blogs.txt")
 close(con)
 
 con <- file("en_US/en_US.news.txt")
 lines <- readLines(con)
 lines <- sample(lines, length(lines)/2, replace = FALSE)
-write(lines, "/home/aleksey/projects/datascience_capstone/data/sample/en_US.news.txt")
+write(lines, "./sample/en_US.news.txt")
 close(con)
 
 con <- file("en_US/en_US.twitter.txt")
 lines <- readLines(con)
 lines <- sample(lines, length(lines)/2, replace = FALSE)
-write(lines, "/home/aleksey/projects/datascience_capstone/data/sample/en_US.twitter.txt")
+write(lines, "./sample/en_US.twitter.txt")
 close(con)
 ```
 
@@ -43,7 +43,21 @@ Now we can create text collextion using 'tm' package and perform some data clean
 
 ```{r, echo=FALSE}
 #create text collection for 3 'en_US' files
-textcol = Corpus(x = DirSource("en_US"), readerControl = list(language = "en_US"))
+textcol = Corpus(x = DirSource("sample"), readerControl = list(language = "en_US"))
 ```
 
+```{r}
+# preprocessing text collection
+textcol <- tm_map(textcol, stripWhitespace)
+textcol <- tm_map(textcol, tolower)
+textcol <- tm_map(textcol, removeNumbers)
+textcol <- tm_map(textcol, removeWords, stopwords("english"))
+```
 
+As we can see we have 3 different kinds of text data: blog, news and tweets. I suppose that relationship between words differs for words inside one sentence and words in other sentences (for example, we have last word in one sentence, and first word in next sentence). I think that predictive model must be trained on data splitted by sentences.
+For splitting data we will use next symbols - '.', '!', '?', '...'.
+After splitting we can remove punctuation symbols.
+
+```{r}
+
+```
