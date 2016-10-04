@@ -45,19 +45,12 @@ Now we can create text collextion using 'tm' package and perform some data clean
 ```{r, echo=FALSE}
 #create text collection for 3 'en_US' files
 textcol = Corpus(x = DirSource("sample"), readerControl = list(language = "en_US"))
-```
-
-```{r}
-# preprocessing text collection
-textcol <- tm_map(textcol, content_transformer(tolower))
-textcol <- tm_map(textcol, content_transformer(removeNumbers))
-textcol <- tm_map(textcol, content_transformer(removeWords), stopwords("english"))
-# remove hash-tags
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("#[A-Za-z]", "", x)))
-textcol <- tm_map(textcol, content_transformer(function(x) gsub('[\"/-:@]', "", x)))
-# remove spaces in begin and end of each text
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("^ | $", "", x)))
-textcol <- tm_map(textcol, content_transformer(stripWhitespace))
+# replace some punctuation symbols on dot
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("[!?]", ".", x)))
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.\\.", ".", x)))
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.", ".", x)))
+# split all content by sentences
+textcol <- tm_map(textcol, content_transformer(function(x) strsplit(x, "[.]")))
 ```
 
 As we can see we have 3 different kinds of text data: blog, news and tweets. I suppose that relationship between words differs for words inside one sentence and words in other sentences (for example, we have last word in one sentence, and first word in next sentence). I think that predictive model must be trained on data splitted by sentences.
@@ -65,10 +58,26 @@ For splitting data we will use next symbols - '.', '!', '?', '...'.
 After splitting we can remove punctuation symbols.
 
 ```{r}
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("[!?]", ".", x)))
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.\\.", ".", x)))
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.", ".", x)))
-textcol <- tm_map(textcol, function(x) strsplit(x, "[.]", fixed = TRUE))
+# now we must transform content of text corpus in flat list, which we can analyze
+text <- c(content(textcol[[1]]), content(textcol[[2]]), content(textcol[[3]]))
+text <- strsplit(text, "[.]")
+text <- unlist(text)
+text <- temp[nchar(text) > 30]
+
+```
+
+```{r}
+# preprocessing text
+text <- tolower(text)
+text <- removeNumbers(text)
+text <- removeWords(text, stopwords("english"))
+# remove hash-tags
+text <- gsub("#[A-Za-z]", "", text)
+text <- gsub('[\"/-:@)(]', "", text)
+# remove spaces in begin and end of each text
+text <- gsub("^ | $", "", text)
+text <- removePunctuation(text)
+text <- stripWhitespace(text)
 ```
 
 Now we need write function for tokenization text corpus
@@ -79,6 +88,6 @@ TriTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=3, max=3))
 ```
 Create tokenized documents
 ```{r}
-dtm1 <- DocumentTermMatrix(textcol, control = list(tokenize = Tokenizer))
+dtm1 <- DocumentTermMatrix(text, control = list(tokenize = Tokenizer))
 
 ```
