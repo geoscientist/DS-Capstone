@@ -1,93 +1,174 @@
 ---
-title: "Capstone project"
+title: "Data Science Capstone project (Milestone Report)"
 author: "Aleksey Glotov"
-date: "28 July 2016 г."
+date: "11 February 2017"
 output: html_document
 ---
-## Load packages
-```{r}
+
+This Report illustate process of exploratory data analysis for text data. All process include some stages:  
+1. Data acquisition  
+2. Data preprocessing and cleaning  
+3. Exploratory Data Analysis  
+3a. Data Tokenization  
+3b. Frequency Analysis  
+3c. Wordcloud plotting  
+4. Conclusion
+
+For text data analysis we will use 'tm', 'RWeka', 'wordcloud' and 'ggplot2' packages.
+```{r, message=FALSE}
 require(ggplot2)
 require(tm)
 require(RWeka)
+require(wordcloud)
+require(stringi)
 ```
 
 
 ## Data acquisition
+At the data acqusition step we download raw data, create samples (10 percent from raw data) which we will analyse at the next steps, and construct text corpus object using 'tm' package.
+```{r, cache=TRUE}
 
-```{r}
-download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", destfile = "swiftkey.zip")
-unzip(zipfile = "swiftkey.zip")
+#download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", destfile = "swiftkey.zip")
+#unzip(zipfile = "swiftkey.zip")
 
 ```
 
-```{r}
-con <- file("en_US/en_US.blogs.txt")
-lines <- readLines(con)
-lines <- sample(lines, length(lines)/5, replace = FALSE)
-write(lines, "./sample/en_US.blogs.txt")
+```{r, cache=TRUE, message=FALSE, warning=FALSE}
+con <- file("data/final/en_US/en_US.blogs.txt")
+blogs <- readLines(con)
+lines <- sample(blogs, length(lines)/10, replace = FALSE)
+write(lines, "data/sample/en_US.blogs.txt")
 close(con)
 
-con <- file("en_US/en_US.news.txt")
-lines <- readLines(con)
-lines <- sample(lines, length(lines)/5, replace = FALSE)
-write(lines, "./sample/en_US.news.txt")
+con <- file("data/final/en_US/en_US.news.txt")
+news <- readLines(con)
+lines <- sample(news, length(lines)/10, replace = FALSE)
+write(lines, "data/sample/en_US.news.txt")
 close(con)
 
-con <- file("en_US/en_US.twitter.txt")
-lines <- readLines(con)
-lines <- sample(lines, length(lines)/5, replace = FALSE)
-write(lines, "./sample/en_US.twitter.txt")
+con <- file("data/final/en_US/en_US.twitter.txt")
+twits <- readLines(con)
+lines <- sample(twits, length(lines)/10, replace = FALSE)
+write(lines, "data/sample/en_US.twitter.txt")
 close(con)
-```
 
-Now we can create text collextion using 'tm' package and perform some data cleaning steps:
+# basic statistics for raw data
+blogs_size <- file.info("data/final/en_US/en_US.blogs.txt")$size / 1024 ^2
+news_size <- file.info("data/final/en_US/en_US.news.txt")$size / 1024 ^2
+twits_size <- file.info("data/final/en_US/en_US.twitter.txt")$size / 1024 ^2
 
-```{r, echo=FALSE}
+blogs_words <- stri_count_words(blogs)
+news_words <- stri_count_words(news)
+twits_words <- stri_count_words(twits)
+
+data.frame(source = c("blogs", "news", "twits"),
+           file_size = c(blogs_size, news_size, twits_size),
+           lines_count = c(length(blogs), length(news), length(twits)),
+           words_count = c(sum(blogs_words), sum(news_words), sum(twits_words)))
+
 #create text collection for 3 'en_US' files
-textcol = Corpus(x = DirSource("sample"), readerControl = list(language = "en_US"))
-# replace some punctuation symbols on dot
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("[!?]", ".", x)))
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.\\.", ".", x)))
-textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.", ".", x)))
-# split all content by sentences
-textcol <- tm_map(textcol, content_transformer(function(x) strsplit(x, "[.]")))
+textcol = Corpus(x = DirSource("data/sample"), readerControl = list(language = "en_US"))
+```
+
+## Data Preprocessing and cleaning
+At this step we must clean data:
+```{r, cache=TRUE}
+# preprocessing text collection
+textcol <- tm_map(textcol, content_transformer(tolower))
+textcol <- tm_map(textcol, content_transformer(removeNumbers))
+textcol <- tm_map(textcol, content_transformer(removeWords), stopwords("english"))
+# remove hash-tags
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("#[A-Za-z]", "", x)))
+textcol <- tm_map(textcol, content_transformer(function(x) gsub('[\"/-:@]', "", x)))
+# remove spaces in begin and end of each text
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("^ | $", "", x)))
+textcol <- tm_map(textcol, content_transformer(stripWhitespace))
 ```
 
 As we can see we have 3 different kinds of text data: blog, news and tweets. I suppose that relationship between words differs for words inside one sentence and words in other sentences (for example, we have last word in one sentence, and first word in next sentence). I think that predictive model must be trained on data splitted by sentences.
 For splitting data we will use next symbols - '.', '!', '?', '...'.
 After splitting we can remove punctuation symbols.
 
-```{r}
-# now we must transform content of text corpus in flat list, which we can analyze
-text <- c(content(textcol[[1]]), content(textcol[[2]]), content(textcol[[3]]))
-text <- strsplit(text, "[.]")
-text <- unlist(text)
-text <- temp[nchar(text) > 30]
-
+```{r, cache=TRUE}
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("[!?]", ".", x)))
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.\\.", ".", x)))
+textcol <- tm_map(textcol, content_transformer(function(x) gsub("\\.\\.", ".", x)))
+textcol <- tm_map(textcol, content_transformer(function(x) strsplit(x, "[.]", fixed = TRUE)))
+textcol <- tm_map(textcol, content_transformer(removePunctuation))
 ```
 
+## Exploratory Data Analysis
+### Data tokenization
+Now we need to create functions for bigram and trigram tokenization using 'RWeka' package
+```{r, cache=TRUE}
+bigram <- function(x) NGramTokenizer(x, Weka_control(min=2, max=2))
+trigram <- function(x) NGramTokenizer(x, Weka_control(min=3, max=3))
+```
+Create term-document matrixes for ngrams
+```{r, cache=TRUE}
+options(mc.cores = 1)
+unigram.tdm <- TermDocumentMatrix(textcol)
+bigram.tdm <- TermDocumentMatrix(textcol, control = list(tokenize = bigram))
+trigram.tdm <- TermDocumentMatrix(textcol, control = list(tokenize = trigram))
+```
+Calculate total count of words in each text
 ```{r}
-# preprocessing text
-text <- tolower(text)
-text <- removeNumbers(text)
-text <- removeWords(text, stopwords("english"))
-# remove hash-tags
-text <- gsub("#[A-Za-z]", "", text)
-text <- gsub('[\"/-:@)(]', "", text)
-# remove spaces in begin and end of each text
-text <- gsub("^ | $", "", text)
-text <- removePunctuation(text)
-text <- stripWhitespace(text)
+wordcount <- colSums(as.matrix(unigram.tdm))
+```
+As we can see blogs contains 1914270 words, news - 1942298, and twitter - 1681328.
+
+### Frequency analysis
+Let's construct function which performs operation for creating data frame with words frequency statistics
+```{r, cache=TRUE}
+get_freq <- function(tdm){
+  freqs <- sort(rowSums(as.matrix(tdm)), decreasing = T)
+  return(data.frame(word = names(freqs), count = freqs))
+}
+unigram.freq <- get_freq(unigram.tdm)
+bigram.freq <- get_freq(bigram.tdm)
+trigram.freq <- get_freq(trigram.tdm)
+```
+Also we can calcualte 50% and 90% count of words in all lexicon, these values may be used for predictive model optimization (for example: we can use 90% most frequent n-grams).
+
+```{r, cache=TRUE, message=FALSE}
+words_percent <- function(df, per) {
+  sum = 0
+  total = sum(df$count)
+  for (i in seq_len(nrow(df))) {
+    sum = sum + df$count[i]
+    if ((sum/total) > per) {
+      print(i)
+      break()
+      }
+  }
+}
+
+# 50% count of words
+words_percent(unigram.freq, 0.5)
+
+# 90% count of words
+words_percent(unigram.freq, 0.9)
 ```
 
-Now we need write function for tokenization text corpus
-```{r}
-Tokenizer <- function(x) NGramTokenizer(x, Weka_control(min=1, max=1))
-BiTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=2, max=2))
-TriTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=3, max=3))
+Now we construct n-gram plot function:
+```{r, cache=TRUE}
+ngram_plot <- function(data, label) {
+  ggplot(data[1:20, ], aes(reorder(word, -count), count))+
+           labs(x=label, y= 'Count') + theme(axis.text.x = element_text(
+             angle = 70, size=10, hjust = 1)) + geom_bar(stat = "identity")
+}
+ngram_plot(unigram.freq, "Most frequent unigrams")
+ngram_plot(bigram.freq, "Most frequent bigrams")
+ngram_plot(trigram.freq, "Most frequent trigrams")
 ```
-Create tokenized documents
-```{r}
-dtm1 <- DocumentTermMatrix(text, control = list(tokenize = Tokenizer))
+### Wordcloud plotting
+In the next step we use wordcloud method for visualization most frequent words in n-gram tokenized text.
+```{r, cache=TRUE, message=FALSE, warning=FALSE}
+wordcloud(unigram.freq$word, unigram.freq$count, min.freq = 10000, max.words = 30, colors = brewer.pal(4, "OrRd"))
+wordcloud(bigram.freq$word, bigram.freq$count, min.freq = 500, max.words = 20, colors = brewer.pal(4, "OrRd"))
+wordcloud(trigram.freq$word, trigram.freq$count, min.freq = 70, max.words = 20, colors = brewer.pal(4, "OrRd"))
+```
 
-```
+## Conclusion
+Now we ready for constructing predictive model based on n-gram tokenized model. For prediction we will look for bigrams and trigrams which contains user word and reccomend him three most frequent cases.
+Resulting wodel will be deployed as Shiny application, user interface will contain two main elements - input form for word typing, and panel with three reccomended words.
